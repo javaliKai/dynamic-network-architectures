@@ -18,7 +18,8 @@ from torch.nn.modules.conv import _ConvNd
 from torch.nn.modules.dropout import _DropoutNd
 
 # NEW IMPORTS
-from dynamic_network_architectures.building_blocks.new.sgcm_fusion import SGCMFusion
+# from dynamic_network_architectures.building_blocks.new.sgcm_fusion import SGCMFusion
+from dynamic_network_architectures.building_blocks.new.cgcm_fusion import CGCMFusion
 
 # UPDATE: with SGCMFusion
 class PlainConvUNet(AbstractDynamicNetworkArchitectures):
@@ -91,7 +92,14 @@ class PlainConvUNet(AbstractDynamicNetworkArchitectures):
 
         # NEW BLOCK!
         bottleneck_ch = self.encoder.output_channels[-1]
-        self.sgcm_fusion = SGCMFusion(in_channels=bottleneck_ch, two_modality_mode=False)
+        # self.sgcm_fusion = SGCMFusion(in_channels=bottleneck_ch, two_modality_mode=False)
+        self.cgcm_fusion = CGCMFusion(
+            in_channels=bottleneck_ch,
+            two_modality_mode=False,   # or True for 2-modality student
+            norm_type="bn",
+            compress=True,
+        )
+
 
         self.decoder = UNetDecoder(
             self.encoder, num_classes, n_conv_per_stage_decoder, deep_supervision, nonlin_first=nonlin_first
@@ -99,7 +107,8 @@ class PlainConvUNet(AbstractDynamicNetworkArchitectures):
 
     def forward(self, x):
         skips = self.encoder(x)
-        skips[-1] = self.sgcm_fusion(skips[-1])
+        # skips[-1] = self.sgcm_fusion(skips[-1])
+        skips[-1] = self.cgcm_fusion(skips[-1])
         return self.decoder(skips)
 
     def compute_conv_feature_map_size(self, input_size):
