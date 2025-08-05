@@ -18,7 +18,7 @@ from torch.nn.modules.conv import _ConvNd
 from torch.nn.modules.dropout import _DropoutNd
 
 # NEW IMPORTS
-# from dynamic_network_architectures.building_blocks.new.sgcm_fusion import SGCMFusion
+from dynamic_network_architectures.building_blocks.new.sgcm_fusion import SGCMFusion
 from dynamic_network_architectures.building_blocks.new.cgcm_fusion import CGCMFusion
 
 # UPDATE: with SGCMFusion
