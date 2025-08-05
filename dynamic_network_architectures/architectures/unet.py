@@ -92,12 +92,17 @@ class PlainConvUNet(AbstractDynamicNetworkArchitectures):
 
         # NEW BLOCK!
         bottleneck_ch = self.encoder.output_channels[-1]
-        # self.sgcm_fusion = SGCMFusion(in_channels=bottleneck_ch, two_modality_mode=False)
+        self.sgcm_fusion = SGCMFusion(in_channels=bottleneck_ch, two_modality_mode=False)
         self.cgcm_fusion = CGCMFusion(
             in_channels=bottleneck_ch,
             two_modality_mode=False,   # or True for 2-modality student
-            norm_type="bn",
-            compress=True,
+        )
+        # Combine sgcm and cgcm
+        # -- this block merges both and restores the shape back to bottleneck channel
+        self.bottleneck_compress = nn.Sequential(
+            nn.Conv3d(bottleneck_ch * 2, bottleneck_ch, kernel_size=1, bias=False),
+            nn.BatchNorm3d(bottleneck_ch),
+            nn.LeakyReLU(inplace=True),
         )
 
 
@@ -107,8 +112,17 @@ class PlainConvUNet(AbstractDynamicNetworkArchitectures):
 
     def forward(self, x):
         skips = self.encoder(x)
-        # skips[-1] = self.sgcm_fusion(skips[-1])
-        skips[-1] = self.cgcm_fusion(skips[-1])
+
+        # run the two graph reasonings
+        x_sgcm = self.sgcm_fusion(skips[-1])  # out: [B, C, D, H, W]
+        x_cgcm = self.cgcm_fusion(skips[-1])  # out: [B, C, D, H, W]
+
+        # concat the result
+        x_fused = torch.cat([x_sgcm, x_cgcm], dim=1)  # out: [B, 2C, D, H, W]
+
+        # calibrate the channel to match decoder input
+        skips[-1] = self.bottleneck_compress(x_fused)  # out back to: [B, C, D, H, W]
+
         return self.decoder(skips)
 
     def compute_conv_feature_map_size(self, input_size):
