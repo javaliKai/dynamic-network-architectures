@@ -13,6 +13,10 @@ from dynamic_network_architectures.building_blocks.unet_decoder import UNetDecod
 from dynamic_network_architectures.building_blocks.unet_residual_decoder import UNetResDecoder
 from dynamic_network_architectures.initialization.weight_init import InitWeights_He
 from dynamic_network_architectures.initialization.weight_init import init_last_bn_before_add_to_0
+
+# NEW
+from dynamic_network_architectures.building_blocks.new.vss3d_bottleneck import VSS3DBottleneck
+
 from torch import nn
 from torch.nn.modules.conv import _ConvNd
 from torch.nn.modules.dropout import _DropoutNd
@@ -85,12 +89,31 @@ class PlainConvUNet(AbstractDynamicNetworkArchitectures):
             return_skips=True,
             nonlin_first=nonlin_first,
         )
+
+        # NEW BLOCK! VSS3D
+        bottleneck_channels = self.encoder.output_channels[-1]
+        self.vss3d = VSS3DBottleneck(
+            channels=bottleneck_channels,
+            depth=1,             # replicate paper → 1 SS3D block
+            d_state=16,
+            drop_path_rate=0.05,
+            attn_drop=0.0,
+            mlp_drop=0.0,
+            expansion_factor=1,
+            use_checkpoint=False,
+            orientation_order=None,
+            add_post_layernorm=True,
+            mamba_layers=6       # replicate paper → 6 stacked Mamba layers inside SS3D
+        )
+
+
         self.decoder = UNetDecoder(
             self.encoder, num_classes, n_conv_per_stage_decoder, deep_supervision, nonlin_first=nonlin_first
         )
 
     def forward(self, x):
         skips = self.encoder(x)
+        skips[-1] = self.vss3d(skips[-1])   # bottleneck refinement
         return self.decoder(skips)
 
     def compute_conv_feature_map_size(self, input_size):
