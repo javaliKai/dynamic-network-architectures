@@ -113,6 +113,7 @@ class PlainConvUNet(AbstractDynamicNetworkArchitectures):
 
     def forward(self, x):
         skips = self.encoder(x)
+        print("[Debug] VSS3D is intact...")
         skips[-1] = self.vss3d(skips[-1])   # bottleneck refinement
         return self.decoder(skips)
 
