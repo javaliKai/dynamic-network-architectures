@@ -43,33 +43,41 @@
         "force_separate_z": null
       },
       "architecture": {
-        "network_class_name": "dynamic_network_architectures.architectures.unet.ResidualEncoderUNet",
+        "network_class_name": "dynamic_network_architectures.architectures.unet.PlainConvUNet",
         "arch_kwargs": {
-          "n_stages": 4,
-          "features_per_stage": [32, 64, 128, 256],
-          "conv_op": "torch.nn.modules.conv.Conv3d",
+          "n_stages": 6,
+          "features_per_stage": [32, 64, 128, 256, 512, 512],
+          "conv_op": "torch.nn.modules.conv.Conv2d",
           "kernel_sizes": [
-            [3, 3, 3],
-            [3, 3, 3],
-            [5, 5, 5],
-            [5, 5, 5]
+            [3, 3],
+            [3, 3],
+            [3, 3],
+            [3, 3],
+            [3, 3],
+            [3, 3]
           ],
           "strides": [
-            [1, 1, 1],
-            [2, 2, 2],
-            [2, 2, 2],
-            [2, 2, 2]
+            [1, 1],
+            [2, 2],
+            [2, 2],
+            [2, 2],
+            [2, 2],
+            [2, 2]
           ],
-          "n_blocks_per_stage": [2, 2, 2, 2],
-          "num_classes": 4,
-          "n_conv_per_stage_decoder": [2, 2, 2],
+          "n_conv_per_stage": [2, 2, 2, 2, 2, 2],
+          "n_conv_per_stage_decoder": [2, 2, 2, 2, 2],
           "conv_bias": true,
-          "norm_op": "torch.nn.modules.instancenorm.InstanceNorm3d",
-          "norm_op_kwargs": { "eps": 1e-5, "affine": true },
+          "norm_op": "torch.nn.modules.instancenorm.InstanceNorm2d",
+          "norm_op_kwargs": {
+            "eps": 1e-5,
+            "affine": true
+          },
           "dropout_op": null,
           "dropout_op_kwargs": null,
           "nonlin": "torch.nn.LeakyReLU",
-          "nonlin_kwargs": { "inplace": true }
+          "nonlin_kwargs": {
+            "inplace": true
+          }
         },
         "_kw_requires_import": ["conv_op", "norm_op", "dropout_op", "nonlin"]
       },
@@ -110,44 +118,36 @@
         "order_z": 0,
         "force_separate_z": null
       },
+
       "architecture": {
-        "network_class_name": "dynamic_network_architectures.architectures.unet.PlainConvUNet",
+        "network_class_name": "dynamic_network_architectures.architectures.unet.ResidualEncoderUNet",
         "arch_kwargs": {
-          "n_stages": 6,
-          "features_per_stage": [32, 64, 128, 256, 320, 320],
+          "n_stages": 4,
+          "features_per_stage": [32, 64, 128, 256],
           "conv_op": "torch.nn.modules.conv.Conv3d",
           "kernel_sizes": [
             [3, 3, 3],
             [3, 3, 3],
-            [3, 3, 3],
-            [3, 3, 3],
-            [3, 3, 3],
-            [3, 3, 3]
+            [5, 5, 5],
+            [5, 5, 5]
           ],
           "strides": [
             [1, 1, 1],
             [2, 2, 2],
             [2, 2, 2],
-            [2, 2, 2],
-            [2, 2, 2],
             [2, 2, 2]
           ],
-          "n_conv_per_stage": [2, 2, 2, 2, 2, 2],
-          "n_conv_per_stage_decoder": [2, 2, 2, 2, 2],
+          "n_blocks_per_stage": [2, 2, 2, 2],
+          "num_classes": 4,
+          "n_conv_per_stage_decoder": [2, 2, 2],
           "conv_bias": true,
           "norm_op": "torch.nn.modules.instancenorm.InstanceNorm3d",
-          "norm_op_kwargs": {
-            "eps": 1e-5,
-            "affine": true
-          },
+          "norm_op_kwargs": { "eps": 1e-5, "affine": true },
           "dropout_op": null,
           "dropout_op_kwargs": null,
           "nonlin": "torch.nn.LeakyReLU",
-          "nonlin_kwargs": {
-            "inplace": true
-          }
-        },
-        "_kw_requires_import": ["conv_op", "norm_op", "dropout_op", "nonlin"]
+          "nonlin_kwargs": { "inplace": true }
+        }
       },
       "batch_dice": false
     }
