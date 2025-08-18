@@ -103,7 +103,7 @@ class PlainConvUNet(AbstractDynamicNetworkArchitectures):
             use_checkpoint=False,
             orientation_order=None,
             add_post_layernorm=True,
-            mamba_layers=6       # replicate paper → 6 stacked Mamba layers inside SS3D
+            # mamba_layers=6       # replicate paper → 6 stacked Mamba layers inside SS3D
         )
 
 
@@ -198,10 +198,28 @@ class ResidualEncoderUNet(AbstractDynamicNetworkArchitectures):
             disable_default_stem=False,
             stem_channels=stem_channels,
         )
+
+         # NEW BLOCK! VSS3D
+        bottleneck_channels = self.encoder.output_channels[-1]
+        self.vss3d = VSS3DBottleneck(
+            channels=bottleneck_channels,
+            depth=1,             # replicate paper → 1 SS3D block
+            d_state=16,
+            drop_path_rate=0.05,
+            attn_drop=0.0,
+            mlp_drop=0.0,
+            expansion_factor=1,
+            use_checkpoint=False,
+            orientation_order=None,
+            add_post_layernorm=True,
+            # mamba_layers=6       # replicate paper → 6 stacked Mamba layers inside SS3D
+        )
         self.decoder = UNetDecoder(self.encoder, num_classes, n_conv_per_stage_decoder, deep_supervision)
 
     def forward(self, x):
         skips = self.encoder(x)
+        print("[Debug] VSS3D is intact in ResidualEncoderUNet...")
+        skips[-1] = self.vss3d(skips[-1])   # bottleneck refinement
         return self.decoder(skips)
 
     def compute_conv_feature_map_size(self, input_size):
