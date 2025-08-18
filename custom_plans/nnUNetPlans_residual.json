@@ -86,7 +86,7 @@
     "3d_fullres": {
       "data_identifier": "nnUNetPlans_3d_fullres",
       "preprocessor_name": "DefaultPreprocessor",
-      "batch_size": 2,
+      "batch_size": 1,
       "patch_size": [128, 128, 128],
       "median_image_size_in_voxels": [138.0, 169.5, 138.0],
       "spacing": [1.0, 1.0, 1.0],
@@ -138,7 +138,6 @@
             [2, 2, 2]
           ],
           "n_blocks_per_stage": [2, 2, 2, 2],
-          "num_classes": 4,
           "n_conv_per_stage_decoder": [2, 2, 2],
           "conv_bias": true,
           "norm_op": "torch.nn.modules.instancenorm.InstanceNorm3d",
@@ -147,7 +146,8 @@
           "dropout_op_kwargs": null,
           "nonlin": "torch.nn.LeakyReLU",
           "nonlin_kwargs": { "inplace": true }
-        }
+        },
+        "_kw_requires_import": ["conv_op", "norm_op", "dropout_op", "nonlin"]
       },
       "batch_dice": false
     }
