@@ -203,7 +203,7 @@ class ResidualEncoderUNet(AbstractDynamicNetworkArchitectures):
         bottleneck_channels = self.encoder.output_channels[-1]
         self.vss3d = VSS3DBottleneck(
             channels=bottleneck_channels,
-            depth=5,             # original paper uses 9, I will try to use 5
+            depth=4,             # original paper uses 9, I will try to use 5
             d_state=16,
             drop_path_rate=0.05,
             attn_drop=0.0,

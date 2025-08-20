@@ -87,7 +87,7 @@
       "data_identifier": "nnUNetPlans_3d_fullres",
       "preprocessor_name": "DefaultPreprocessor",
       "batch_size": 1,
-      "patch_size": [128, 128, 128],
+      "patch_size": [96, 96, 96],
       "median_image_size_in_voxels": [138.0, 169.5, 138.0],
       "spacing": [1.0, 1.0, 1.0],
       "normalization_schemes": [

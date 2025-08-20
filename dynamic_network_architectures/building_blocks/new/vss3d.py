@@ -46,7 +46,7 @@ class VSSBlock3D_v6(nn.Module): #no multiplicative path, added MLP. more like tr
                                   d_state=d_state,
                                   expand=expansion_factor,
                                   orientation=orientation,
-                                  mamba_layers=6,  # Control the number of consequent SSM (mamba) block here
+                                  mamba_layers=3,  # Control the number of consequent SSM (mamba) block here
                                   **kwargs)
 
     self.ln_2 = norm_layer(hidden_dim)

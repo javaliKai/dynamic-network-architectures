@@ -80,6 +80,7 @@ class SS3D_v6(nn.Module):
 
         # Orientation helpers (same mapping style you used originally)
         if (orientation % 8) == 0:
+            # Mode 0 is the original -- no rotation or translation applied
             self.rot   = lambda x: x
             self.unrot = lambda x: x
         elif (orientation % 8) == 1:
