@@ -9,6 +9,7 @@ from dynamic_network_architectures.building_blocks.simple_conv_blocks import Sta
 from dynamic_network_architectures.building_blocks.helper import get_matching_convtransp
 from dynamic_network_architectures.building_blocks.residual_encoders import ResidualEncoder
 from dynamic_network_architectures.building_blocks.plain_conv_encoder import PlainConvEncoder
+from dynamic_network_architectures.building_blocks.new.fcm import MAFCM3D
 
 
 class UNetDecoder(nn.Module):
@@ -66,9 +67,20 @@ class UNetDecoder(nn.Module):
         stages = []
         transpconvs = []
         seg_layers = []
+
+        # NEW MAFCM FLOW
+        fcm_blocks = []
+
         for s in range(1, n_stages_encoder):
+
             input_features_below = encoder.output_channels[-s]
             input_features_skip = encoder.output_channels[-(s + 1)]
+            
+            # MAFCM list keyword: c_high (bottleneck input) and c_low (skip input)
+            fcm_blocks.append(
+                MAFCM3D(c_low=input_features_skip, c_high=input_features_below, num_modalities=4)
+            )
+
             stride_for_transpconv = encoder.strides[-s]
             transpconvs.append(transpconv_op(
                 input_features_below, input_features_skip, stride_for_transpconv, stride_for_transpconv,
@@ -96,6 +108,7 @@ class UNetDecoder(nn.Module):
         self.stages = nn.ModuleList(stages)
         self.transpconvs = nn.ModuleList(transpconvs)
         self.seg_layers = nn.ModuleList(seg_layers)
+        self.fcm_blocks = nn.ModuleList(fcm_blocks)
 
     def forward(self, skips):
         """
@@ -107,7 +120,11 @@ class UNetDecoder(nn.Module):
         seg_outputs = []
         for s in range(len(self.stages)):
             x = self.transpconvs[s](lres_input)
-            x = torch.cat((x, skips[-(s+2)]), 1)
+            
+            # Checkpoint: this is the logic of skip connection
+            # x = torch.cat((x, skips[-(s+2)]), 1)  # Plain skip connection: direct concatenation
+            x = self.fcm_blocks[s](skips[-(s+2)], x)  # skips refer to c_low, x refer to c_high
+
             x = self.stages[s](x)
             if self.deep_supervision:
                 seg_outputs.append(self.seg_layers[s](x))
