@@ -119,27 +119,28 @@ class UNetDecoder(nn.Module):
         lres_input = skips[-1]
         seg_outputs = []
         for s in range(len(self.stages)):
-            c_low  = skips[-(s+2)]      # skip connection (spatial detail)
-            c_high = lres_input         # raw deeper feature (semantic-rich, before transpose)
+            # skip (spatial detail) and high (semantic)
+            c_low  = skips[-(s+2)]
+            c_high = lres_input
 
-            # Fuse skip + deeper features with FCM (this should internally upsample c_high)
-            x = self.fcm_blocks[s](c_low, c_high)
+            # 1. Upsample high feature
+            h_up = self.transpconvs[s](c_high)
 
-            # Upsample the fused representation with transpose conv
-            x = self.transpconvs[s](x)
+            # 2. Fuse with skip using MAFCM
+            x = self.fcm_blocks[s](c_low, h_up)
 
-            # Local decoder conv refinement
+            # 3. Local refinement
             x = self.stages[s](x)
 
-            # Segmentation head(s)
+            # 4. Segmentation head(s)
             if self.deep_supervision:
                 seg_outputs.append(self.seg_layers[s](x))
             elif s == (len(self.stages) - 1):
                 seg_outputs.append(self.seg_layers[-1](x))
 
-        # Pass forward to next stage
-        lres_input = x
-
+            # 5. Prepare for next stage
+            lres_input = x
+            
         # invert seg outputs so that the largest segmentation prediction is returned first
         seg_outputs = seg_outputs[::-1]
 

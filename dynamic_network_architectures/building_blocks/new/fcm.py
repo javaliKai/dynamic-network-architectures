@@ -74,7 +74,11 @@ class MAFCM3D(nn.Module):
         self.A = nn.Parameter(torch.randn(self.cL_comp, self.M) * 0.02)
 
         # Final fuse after concat
-        self.fuse = nn.Conv3d(self.cL_comp + self.cH_comp, c_low, 1, bias=False)
+        # instead of a fixed out_channels,
+        # set it dynamically based on the input channels of the skip + upsampled bottleneck
+        fused_channels = self.cL_comp + self.cH_comp
+        self.fuse = nn.Conv3d(fused_channels, c_low, kernel_size=1)
+
 
     def _upsample(self, H, target_spatial):
         if self.up_mode == "trilinear":
