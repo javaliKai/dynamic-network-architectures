@@ -119,18 +119,26 @@ class UNetDecoder(nn.Module):
         lres_input = skips[-1]
         seg_outputs = []
         for s in range(len(self.stages)):
-            x = self.transpconvs[s](lres_input)
-            
-            # Checkpoint: this is the logic of skip connection
-            # x = torch.cat((x, skips[-(s+2)]), 1)  # Plain skip connection: direct concatenation
-            x = self.fcm_blocks[s](skips[-(s+2)], x)  # skips refer to c_low, x refer to c_high
+            c_low  = skips[-(s+2)]      # skip connection (spatial detail)
+            c_high = lres_input         # raw deeper feature (semantic-rich, before transpose)
 
+            # Fuse skip + deeper features with FCM (this should internally upsample c_high)
+            x = self.fcm_blocks[s](c_low, c_high)
+
+            # Upsample the fused representation with transpose conv
+            x = self.transpconvs[s](x)
+
+            # Local decoder conv refinement
             x = self.stages[s](x)
+
+            # Segmentation head(s)
             if self.deep_supervision:
                 seg_outputs.append(self.seg_layers[s](x))
             elif s == (len(self.stages) - 1):
                 seg_outputs.append(self.seg_layers[-1](x))
-            lres_input = x
+
+        # Pass forward to next stage
+        lres_input = x
 
         # invert seg outputs so that the largest segmentation prediction is returned first
         seg_outputs = seg_outputs[::-1]
