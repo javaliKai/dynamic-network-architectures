@@ -77,7 +77,7 @@ class MAFCM3D(nn.Module):
         # instead of a fixed out_channels,
         # set it dynamically based on the input channels of the skip + upsampled bottleneck
         fused_channels = self.cL_comp + self.cH_comp
-        self.fuse = nn.Conv3d(fused_channels, c_low, kernel_size=1)
+        self.fuse = nn.Conv3d(fused_channels, 2*c_low, kernel_size=1, bias=False)
 
 
     def _upsample(self, H, target_spatial):

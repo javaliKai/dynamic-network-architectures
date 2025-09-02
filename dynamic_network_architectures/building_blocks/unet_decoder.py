@@ -78,7 +78,7 @@ class UNetDecoder(nn.Module):
             
             # MAFCM list keyword: c_high (bottleneck input) and c_low (skip input)
             fcm_blocks.append(
-                MAFCM3D(c_low=input_features_skip, c_high=input_features_below, num_modalities=4)
+                MAFCM3D(c_low=input_features_skip, c_high=input_features_skip, num_modalities=4)
             )
 
             stride_for_transpconv = encoder.strides[-s]
@@ -140,7 +140,7 @@ class UNetDecoder(nn.Module):
 
             # 5. Prepare for next stage
             lres_input = x
-            
+
         # invert seg outputs so that the largest segmentation prediction is returned first
         seg_outputs = seg_outputs[::-1]
 
