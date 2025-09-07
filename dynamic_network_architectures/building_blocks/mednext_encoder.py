@@ -32,6 +32,29 @@ def _conv_op_to_dim(conv_op: Type[_ConvNd]) -> str:
         return "2d"
     raise NotImplementedError(f"MedNeXtEncoder only supports Conv2d/Conv3d, got {conv_op}")
 
+def _norm_type_from(norm_op, conv_op) -> str:
+    # Handle common cases and nnU-Net helpers
+    if norm_op is None:
+        return 'group'  # fallback to previous default
+    try:
+        if issubclass(norm_op, nn.GroupNorm):
+            return 'group'
+        if issubclass(norm_op, nn.LayerNorm):
+            return 'layer'
+        if issubclass(norm_op, (nn.InstanceNorm2d, nn.InstanceNorm3d)):
+            return 'instance'
+    except TypeError:
+        pass
+    # name-based fallback (handles get_matching_instancenorm, etc.)
+    name = getattr(norm_op, '__name__', str(norm_op))
+    if 'InstanceNorm' in name:
+        return 'instance'
+    if 'GroupNorm' in name:
+        return 'group'
+    if 'LayerNorm' in name:
+        return 'layer'
+    return 'group'
+
 
 class MedNeXtEncoder(nn.Module):
     """
@@ -80,6 +103,13 @@ class MedNeXtEncoder(nn.Module):
         assert pool_type == 'conv', "MedNeXtEncoder currently supports only pool_type='conv' (strided conv in-block)"
 
         dim = _conv_op_to_dim(conv_op)
+
+        # Decide which norm to use
+        self.norm_op = norm_op
+        self.norm_op_kwargs = norm_op_kwargs
+        norm_type = _norm_type_from(norm_op, conv_op)
+        
+
 
         # --- Stem (identical contract to ResidualEncoder) ---
         if not disable_default_stem:
@@ -132,7 +162,7 @@ class MedNeXtEncoder(nn.Module):
                         exp_r=exp_r,
                         kernel_size=k_s,
                         do_res=True,          # residual downsample path
-                        norm_type='group',    # internal to MedNeXt; stem follows plans.json
+                        norm_type=norm_type,    # internal to MedNeXt; stem follows plans.json
                         dim=dim,
                         grn=use_grn
                     )
@@ -146,7 +176,7 @@ class MedNeXtEncoder(nn.Module):
                         exp_r=exp_r,
                         kernel_size=k_s,
                         do_res=True,
-                        norm_type='group',
+                        norm_type=norm_type,
                         dim=dim,
                         grn=use_grn
                     )
@@ -161,7 +191,7 @@ class MedNeXtEncoder(nn.Module):
                         exp_r=exp_r,
                         kernel_size=k_s,
                         do_res=True,
-                        norm_type='group',
+                        norm_type=norm_type,
                         dim=dim,
                         grn=use_grn
                     )
@@ -180,8 +210,6 @@ class MedNeXtEncoder(nn.Module):
 
         # Store meta for decoder/factories
         self.conv_op = conv_op
-        self.norm_op = norm_op
-        self.norm_op_kwargs = norm_op_kwargs
         self.nonlin = nonlin
         self.nonlin_kwargs = nonlin_kwargs
         self.dropout_op = dropout_op

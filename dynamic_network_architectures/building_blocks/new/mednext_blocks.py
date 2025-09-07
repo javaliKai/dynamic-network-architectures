@@ -11,10 +11,12 @@ class MedNeXtBlock(nn.Module):
                 exp_r:int=4, 
                 kernel_size:int=7, 
                 do_res:int=True,
-                norm_type:str = 'group',
-                n_groups:int or None = None,
+                # norm_type:str = 'group',
+                norm_type:str = 'instance', # changed default to InstanceNorm
+                n_groups:int | None = None,
                 dim = '3d',
-                grn = False
+                grn = False,
+                norm_kwargs: dict | None = None
                 ):
 
         super().__init__()
@@ -39,16 +41,24 @@ class MedNeXtBlock(nn.Module):
         )
 
         # Normalization Layer. GroupNorm is used by default.
-        if norm_type=='group':
-            self.norm = nn.GroupNorm(
-                num_groups=in_channels, 
-                num_channels=in_channels
-                )
-        elif norm_type=='layer':
-            self.norm = LayerNorm(
-                normalized_shape=in_channels, 
-                data_format='channels_first'
-                )
+        if norm_type == 'group':
+            # prefer explicit num_groups if provided, else behave like before
+            num_groups = norm_kwargs.pop('num_groups', n_groups if n_groups is not None else in_channels)
+            self.norm = nn.GroupNorm(num_groups=num_groups, num_channels=in_channels, **norm_kwargs)
+
+        elif norm_type == 'instance':
+            if dim == '3d':
+                self.norm = nn.InstanceNorm3d(in_channels, **norm_kwargs)
+            else:
+                self.norm = nn.InstanceNorm2d(in_channels, **norm_kwargs)
+
+        elif norm_type == 'layer':
+            # keep custom LN (channels_first). Allow eps override.
+            eps = norm_kwargs.pop('eps', 1e-5)
+            self.norm = LayerNorm(normalized_shape=in_channels, data_format='channels_first', eps=eps)
+
+        else:
+            raise ValueError(f"Unknown norm_type: {norm_type}")
 
         # Second convolution (Expansion) layer with Conv3D 1x1x1
         self.conv2 = conv(
@@ -104,11 +114,11 @@ class MedNeXtBlock(nn.Module):
 class MedNeXtDownBlock(MedNeXtBlock):
 
     def __init__(self, in_channels, out_channels, exp_r=4, kernel_size=7, 
-                do_res=False, norm_type = 'group', dim='3d', grn=False):
+                do_res=False, norm_type = 'group', dim='3d', grn=False, norm_kwargs: dict | None = None):
 
         super().__init__(in_channels, out_channels, exp_r, kernel_size, 
                         do_res = False, norm_type = norm_type, dim=dim,
-                        grn=grn)
+                        grn=grn, norm_kwargs=norm_kwargs)
 
         if dim == '2d':
             conv = nn.Conv2d
@@ -146,10 +156,10 @@ class MedNeXtDownBlock(MedNeXtBlock):
 class MedNeXtUpBlock(MedNeXtBlock):
 
     def __init__(self, in_channels, out_channels, exp_r=4, kernel_size=7, 
-                do_res=False, norm_type = 'group', dim='3d', grn = False):
+                do_res=False, norm_type = 'group', dim='3d', grn = False, norm_kwargs: dict | None = None):
         super().__init__(in_channels, out_channels, exp_r, kernel_size,
                          do_res=False, norm_type = norm_type, dim=dim,
-                         grn=grn)
+                         grn=grn, norm_kwargs=norm_kwargs)
 
         self.resample_do_res = do_res
         
