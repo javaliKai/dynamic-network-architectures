@@ -285,6 +285,9 @@ class ResidualUNet(nn.Module):
         stem_channels: int = None,
     ):
         super().__init__()
+        self.key_to_encoder = "encoder.stages"
+        self.key_to_stem = "encoder.stem"
+        self.keys_to_in_proj = ("encoder.stem.convs.0.conv", "encoder.stem.convs.0.all_modules.0")
         if isinstance(n_blocks_per_stage, int):
             n_blocks_per_stage = [n_blocks_per_stage] * n_stages
         if isinstance(n_conv_per_stage_decoder, int):
@@ -300,31 +303,69 @@ class ResidualUNet(nn.Module):
             f"stages, so it should have {n_stages - 1} entries. "
             f"n_conv_per_stage_decoder: {n_conv_per_stage_decoder}"
         )
-        self.encoder = ResidualEncoder(
+        # self.encoder = ResidualEncoder(
+        #     input_channels,
+        #     n_stages,
+        #     features_per_stage,
+        #     conv_op,
+        #     kernel_sizes,
+        #     strides,
+        #     n_blocks_per_stage,
+        #     conv_bias,
+        #     norm_op,
+        #     norm_op_kwargs,
+        #     dropout_op,
+        #     dropout_op_kwargs,
+        #     nonlin,
+        #     nonlin_kwargs,
+        #     block,
+        #     bottleneck_channels,
+        #     return_skips=True,
+        #     disable_default_stem=False,
+        #     stem_channels=stem_channels,
+        # )
+
+        self.encoder = DCREncoder(
             input_channels,
-            n_stages,
-            features_per_stage,
+            n_stages,                      # from plans
+            features_per_stage,      # from plans
             conv_op,
-            kernel_sizes,
-            strides,
-            n_blocks_per_stage,
+            kernel_sizes,                  # from plans
+            strides,                            # from plans (we’ll apply on Block-2)
+            n_blocks_per_stage,      # from plans (keep it >= 2)
             conv_bias,
-            norm_op,
-            norm_op_kwargs,
-            dropout_op,
-            dropout_op_kwargs,
-            nonlin,
-            nonlin_kwargs,
-            block,
-            bottleneck_channels,
+            norm_op, norm_op_kwargs,
+            dropout_op, dropout_op_kwargs,
+            nonlin, nonlin_kwargs,
             return_skips=True,
-            disable_default_stem=False,
-            stem_channels=stem_channels,
+            disable_default_stem=False,                      # same behavior as ResidualEncoder
+            stem_channels=None,                              # defaults to features_per_stage[0]
+            pool_type="conv",
+            stochastic_depth_p=getattr(self, "stochastic_depth_p", 0.0),
+            squeeze_excitation=False                         # leave off for now
+            # (Optional) knobs if you exposed them in DCRBlock:
+            # dilation_xy=2, resnet_d_skip=True
+        )
+
+        bottleneck_channels = self.encoder.output_channels[-1]
+        self.vss3d = VSS3DBottleneck(
+            channels=bottleneck_channels,
+            depth=4,             # original paper uses 9, I will try to use 5
+            d_state=16,
+            drop_path_rate=0.05,
+            attn_drop=0.0,
+            mlp_drop=0.0,
+            expansion_factor=1,
+            use_checkpoint=False,
+            orientation_order=None,
+            add_post_layernorm=True,
+            # mamba_layers=6       # replicate paper → 6 stacked Mamba layers inside SS3D
         )
         self.decoder = UNetResDecoder(self.encoder, num_classes, n_conv_per_stage_decoder, deep_supervision)
 
     def forward(self, x):
         skips = self.encoder(x)
+        skips[-1] = self.vss3d(skips[-1])   # bottleneck refinement
         return self.decoder(skips)
 
     def compute_conv_feature_map_size(self, input_size):

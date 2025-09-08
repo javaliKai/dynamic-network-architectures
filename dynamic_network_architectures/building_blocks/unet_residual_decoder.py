@@ -9,6 +9,9 @@ from dynamic_network_architectures.building_blocks.residual_encoders import Resi
 from torch import nn
 from torch.nn.modules.dropout import _DropoutNd
 
+# NEW
+from dynamic_network_architectures.building_blocks.new.fcm import MAFCM3D
+
 
 class UNetResDecoder(nn.Module):
     def __init__(self,
@@ -23,7 +26,8 @@ class UNetResDecoder(nn.Module):
                  dropout_op_kwargs: dict = None,
                  nonlin: Union[None, Type[torch.nn.Module]] = None,
                  nonlin_kwargs: dict = None,
-                 conv_bias: bool = None
+                 conv_bias: bool = None,
+                 num_modalities: int = 4
                  ):
         """
         This class needs the skips of the encoder as input in its forward.
@@ -44,6 +48,7 @@ class UNetResDecoder(nn.Module):
         self.deep_supervision = deep_supervision
         self.encoder = encoder
         self.num_classes = num_classes
+        self.num_modalities = num_modalities
         n_stages_encoder = len(encoder.output_channels)
         if isinstance(n_conv_per_stage, int):
             n_conv_per_stage = [n_conv_per_stage] * (n_stages_encoder - 1)
@@ -64,9 +69,17 @@ class UNetResDecoder(nn.Module):
         stages = []
         transpconvs = []
         seg_layers = []
+        fcm_blocks = []
+
         for s in range(1, n_stages_encoder):
             input_features_below = encoder.output_channels[-s]
             input_features_skip = encoder.output_channels[-(s + 1)]
+
+            # MAFCM list keyword: c_high (bottleneck input) and c_low (skip input)
+            fcm_blocks.append(
+                MAFCM3D(c_low=input_features_skip, c_high=input_features_skip, num_modalities=self.num_modalities)
+            )
+
             stride_for_transpconv = encoder.strides[-s]
             transpconvs.append(transpconv_op(
                 input_features_below, input_features_skip, stride_for_transpconv, stride_for_transpconv,
@@ -97,6 +110,7 @@ class UNetResDecoder(nn.Module):
         self.stages = nn.ModuleList(stages)
         self.transpconvs = nn.ModuleList(transpconvs)
         self.seg_layers = nn.ModuleList(seg_layers)
+        self.fcm_blocks = nn.ModuleList(fcm_blocks)
 
     def forward(self, skips):
         """
@@ -107,9 +121,11 @@ class UNetResDecoder(nn.Module):
         lres_input = skips[-1]
         seg_outputs = []
         for s in range(len(self.stages)):
-            x = self.transpconvs[s](lres_input)
-            x = torch.cat((x, skips[-(s + 2)]), 1)
-            x = self.stages[s](x)
+            # match UNetDecoder flow: upsample → MA-FCM → residual blocks
+            c_low  = skips[-(s+2)]      # skip (spatial detail)
+            c_high = lres_input           # current decoder state / bottleneck (semantic)
+            h_up   = self.transpconvs[s](c_high)
+            x      = self.fcm_blocks[s](c_low, h_up)
             if self.deep_supervision:
                 seg_outputs.append(self.seg_layers[s](x))
             elif s == (len(self.stages) - 1):
