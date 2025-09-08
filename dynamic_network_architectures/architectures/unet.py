@@ -16,6 +16,7 @@ from dynamic_network_architectures.initialization.weight_init import init_last_b
 
 # NEW
 from dynamic_network_architectures.building_blocks.new.vss3d_bottleneck import VSS3DBottleneck
+from dynamic_network_architectures.building_blocks.new.dcr_encoder import DCREncoder
 
 from torch import nn
 from torch.nn.modules.conv import _ConvNd
@@ -177,26 +178,47 @@ class ResidualEncoderUNet(AbstractDynamicNetworkArchitectures):
             f"stages, so it should have {n_stages - 1} entries. "
             f"n_conv_per_stage_decoder: {n_conv_per_stage_decoder}"
         )
-        self.encoder = ResidualEncoder(
+        # self.encoder = ResidualEncoder(
+        #     input_channels,
+        #     n_stages,
+        #     features_per_stage,
+        #     conv_op,
+        #     kernel_sizes,
+        #     strides,
+        #     n_blocks_per_stage,
+        #     conv_bias,
+        #     norm_op,
+        #     norm_op_kwargs,
+        #     dropout_op,
+        #     dropout_op_kwargs,
+        #     nonlin,
+        #     nonlin_kwargs,
+        #     block,
+        #     bottleneck_channels,
+        #     return_skips=True,
+        #     disable_default_stem=False,
+        #     stem_channels=stem_channels,
+        # )
+        self.encoder = DCREncoder(
             input_channels,
-            n_stages,
-            features_per_stage,
+            n_stages,                      # from plans
+            features_per_stage,      # from plans
             conv_op,
-            kernel_sizes,
-            strides,
-            n_blocks_per_stage,
+            kernel_sizes,                  # from plans
+            strides,                            # from plans (we’ll apply on Block-2)
+            n_blocks_per_stage,      # from plans (keep it >= 2)
             conv_bias,
-            norm_op,
-            norm_op_kwargs,
-            dropout_op,
-            dropout_op_kwargs,
-            nonlin,
-            nonlin_kwargs,
-            block,
-            bottleneck_channels,
+            norm_op, norm_op_kwargs,
+            dropout_op, dropout_op_kwargs,
+            nonlin, nonlin_kwargs,
             return_skips=True,
-            disable_default_stem=False,
-            stem_channels=stem_channels,
+            disable_default_stem=False,                      # same behavior as ResidualEncoder
+            stem_channels=None,                              # defaults to features_per_stage[0]
+            pool_type="conv",
+            stochastic_depth_p=getattr(self, "stochastic_depth_p", 0.0),
+            squeeze_excitation=False                         # leave off for now
+            # (Optional) knobs if you exposed them in DCRBlock:
+            # dilation_xy=2, resnet_d_skip=True
         )
 
          # NEW BLOCK! VSS3D
