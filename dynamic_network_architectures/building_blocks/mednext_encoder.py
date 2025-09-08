@@ -164,7 +164,8 @@ class MedNeXtEncoder(nn.Module):
                         do_res=True,          # residual downsample path
                         norm_type=norm_type,    # internal to MedNeXt; stem follows plans.json
                         dim=dim,
-                        grn=use_grn
+                        grn=use_grn,
+                        norm_kwargs=self.norm_op_kwargs
                     )
                 )
             else:
@@ -178,7 +179,8 @@ class MedNeXtEncoder(nn.Module):
                         do_res=True,
                         norm_type=norm_type,
                         dim=dim,
-                        grn=use_grn
+                        grn=use_grn,
+                        norm_kwargs=self.norm_op_kwargs
                     )
                 )
 
@@ -193,7 +195,8 @@ class MedNeXtEncoder(nn.Module):
                         do_res=True,
                         norm_type=norm_type,
                         dim=dim,
-                        grn=use_grn
+                        grn=use_grn,
+                        norm_kwargs=self.norm_op_kwargs
                     )
                 )
 

@@ -2,6 +2,17 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+# Fix for sudden NaN loss
+class FP32NormWrapper(nn.Module):
+    def __init__(self, base_norm: nn.Module):
+        super().__init__()
+        self.base_norm = base_norm
+
+    def forward(self, x):
+        # upcast to float32 for numerically sensitive normalization
+        y = self.base_norm(x.float())
+        # cast back to the original (AMP) dtype to keep speed/memory benefits
+        return y.to(x.dtype)
 
 class MedNeXtBlock(nn.Module):
 
@@ -44,21 +55,24 @@ class MedNeXtBlock(nn.Module):
         if norm_type == 'group':
             # prefer explicit num_groups if provided, else behave like before
             num_groups = norm_kwargs.pop('num_groups', n_groups if n_groups is not None else in_channels)
-            self.norm = nn.GroupNorm(num_groups=num_groups, num_channels=in_channels, **norm_kwargs)
+            base = nn.GroupNorm(num_groups=num_groups, num_channels=in_channels, **norm_kwargs)
 
         elif norm_type == 'instance':
             if dim == '3d':
-                self.norm = nn.InstanceNorm3d(in_channels, **norm_kwargs)
+                base = nn.InstanceNorm3d(in_channels, **norm_kwargs)
             else:
-                self.norm = nn.InstanceNorm2d(in_channels, **norm_kwargs)
+                base = nn.InstanceNorm2d(in_channels, **norm_kwargs)
 
         elif norm_type == 'layer':
             # keep custom LN (channels_first). Allow eps override.
             eps = norm_kwargs.pop('eps', 1e-5)
-            self.norm = LayerNorm(normalized_shape=in_channels, data_format='channels_first', eps=eps)
+            base = LayerNorm(normalized_shape=in_channels, data_format='channels_first', eps=eps)
 
         else:
             raise ValueError(f"Unknown norm_type: {norm_type}")
+
+        # Patch: turning into fp32-safe
+        self.norm = FP32NormWrapper(base)
 
         # Second convolution (Expansion) layer with Conv3D 1x1x1
         self.conv2 = conv(
